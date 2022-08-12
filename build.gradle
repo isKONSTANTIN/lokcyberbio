@@ -1,0 +1,31 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group 'su.knst.lokcyberbio'
+version '1.0-SNAPSHOT'
+
+mainClassName = group + '.Main'
+
+repositories {
+    mavenCentral()
+
+    flatDir {
+        dirs 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+}
+
+jar {
+    from configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+
+    manifest {
+        attributes(
+                'Main-Class': mainClassName
+        )
+    }
+}
