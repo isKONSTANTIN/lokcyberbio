@@ -1,7 +1,9 @@
 package su.knst.lokcyberbio.interpreter.utils;
 
+import static su.knst.lokcyberbio.interpreter.Interpreter.getValueFromDNAArg;
+
 public class DirectionProvider {
-    protected static Direction[] DIRECTIONS = new Direction[] {
+    public static final Direction[] DIRECTIONS = new Direction[] {
             new Direction(-1, 1),
             new Direction(0, 1),
             new Direction(1, 1),
@@ -16,9 +18,6 @@ public class DirectionProvider {
     };
 
     public static Direction getDirection(int arg) {
-        if (arg > 7 || arg < 0)
-            return null;
-
-        return DIRECTIONS[arg];
+        return DIRECTIONS[getValueFromDNAArg(arg, 7)];
     }
 }

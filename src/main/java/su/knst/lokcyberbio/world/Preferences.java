@@ -1,57 +1,61 @@
 package su.knst.lokcyberbio.world;
 
+import su.knst.lokcyberbio.interpreter.DNACommand;
+
 public class Preferences {
     protected int DNASize = 64;
-    protected int worldWidth = 100;
-    protected int worldHeight = 300;
+    protected int worldWidth = 200;
+    protected int worldHeight = 200;
 
-    protected int botPunchedCost = 150;
-    protected int botRegenCost = 50;
+    protected int botDoublingCost = 60;
     protected int botStepCost = 1;
-    protected int botMoveCost = 20;
-    protected int botAnotherHitCost = 10;
+    protected int botMoveCost = 10;
+    protected int botAnotherHitCost = 50;
 
-    protected int botRegenAmount = 25;
-    protected int botAnotherEatAmountMin = 10;
-    protected int botPhotosynthesisAmount = 10;
-
-    protected int botMaxHealth = 300;
-    protected int botMaxEnergy = 1000;
+    protected float botMoveEnergyAmount = 0.5f;
+    protected int botPhotosynthesisAmount = 30;
+    protected int botEatMineralAmount = 60;
+    protected int botEatMineralCost = 100;
+    protected int botMaxEnergy = 800;
 
     protected int maxInterpreterStepsPerBot = 64 * 2;
-    protected int botDNAEmptyAddition = 10;
+    protected int botDNAMaxCommand = Math.max(DNACommand.values().length, 64);
+    protected int radiation = 4; // 1 / 4
+    protected int DNAMutation = 1; // 1 per radiation event
 
     public Preferences() {
     }
 
-    public Preferences(int DNASize, int worldWidth, int worldHeight, int botPunchedCost, int botRegenCost, int botDoublingCost, int botStepCost, int botMoveCost, int botAnotherHitCost, int botRegenAmount, int botAnotherEatAmount, int botPhotosynthesisAmount, int botMaxHealth, int botMaxEnergy, int maxInterpreterStepsPerBot, int botDNAEmptyAddition) {
-        this.DNASize = DNASize;
-        this.worldWidth = worldWidth;
-        this.worldHeight = worldHeight;
-        this.botPunchedCost = botPunchedCost;
-        this.botRegenCost = botRegenCost;
-        this.botStepCost = botStepCost;
-        this.botMoveCost = botMoveCost;
-        this.botAnotherHitCost = botAnotherHitCost;
-        this.botRegenAmount = botRegenAmount;
-        this.botAnotherEatAmountMin = botAnotherEatAmount;
-        this.botPhotosynthesisAmount = botPhotosynthesisAmount;
-        this.botMaxHealth = botMaxHealth;
-        this.botMaxEnergy = botMaxEnergy;
-        this.maxInterpreterStepsPerBot = maxInterpreterStepsPerBot;
-        this.botDNAEmptyAddition = botDNAEmptyAddition;
+    public int getRadiation() {
+        return radiation;
     }
 
-    public int getBotDNAEmptyAddition() {
-        return botDNAEmptyAddition;
+    public int getDNAMutation() {
+        return DNAMutation;
+    }
+
+    public int getBotEatMineralAmount() {
+        return botEatMineralAmount;
+    }
+
+    public int getBotEatMineralCost() {
+        return botEatMineralCost;
+    }
+
+    public float getBotMoveEnergyAmount() {
+        return botMoveEnergyAmount;
+    }
+
+    public int getBotDoublingCost() {
+        return botDoublingCost;
+    }
+
+    public int getBotDNAMaxCommand() {
+        return botDNAMaxCommand;
     }
 
     public int getBotPhotosynthesisAmount() {
         return botPhotosynthesisAmount;
-    }
-
-    public int getBotMaxHealth() {
-        return botMaxHealth;
     }
 
     public int getBotMaxEnergy() {
@@ -60,10 +64,6 @@ public class Preferences {
 
     public int getBotAnotherHitCost() {
         return botAnotherHitCost;
-    }
-
-    public int getBotAnotherEatAmountMin() {
-        return botAnotherEatAmountMin;
     }
 
     public int getDNASize() {
@@ -82,20 +82,8 @@ public class Preferences {
         return botMoveCost;
     }
 
-    public int getBotPunchedCost() {
-        return botPunchedCost;
-    }
-
-    public int getBotRegenCost() {
-        return botRegenCost;
-    }
-
     public int getBotStepCost() {
         return botStepCost;
-    }
-
-    public int getBotRegenAmount() {
-        return botRegenAmount;
     }
 
     public int getMaxInterpreterStepsPerBot() {

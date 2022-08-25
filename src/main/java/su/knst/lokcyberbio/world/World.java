@@ -1,20 +1,50 @@
 package su.knst.lokcyberbio.world;
 
 import su.knst.lokcyberbio.bot.Bot;
+import su.knst.lokcyberbio.bot.DNAConstructor;
 import su.knst.lokcyberbio.interpreter.Interpreter;
+import su.knst.lokcyberbio.interpreter.DNACommand;
+import su.knst.lokutils.objects.Color;
 import su.knst.lokutils.objects.Point;
 
 public class World {
     protected final Preferences preferences;
-    protected Bot[][] bots;
+    protected Cell[][] cells;
+    protected boolean[][] cellsHandled;
     protected Interpreter interpreter;
     protected RandomEngine randomEngine;
 
-    public World(Preferences preferences) {
+    public World(Preferences preferences, long seed) {
         this.preferences = preferences;
         this.interpreter = new Interpreter(this);
-        this.bots = new Bot[preferences.getWorldWidth()][preferences.getWorldHeight()];
-        this.randomEngine = new RandomEngine(0, preferences);
+        initCells();
+        this.randomEngine = new RandomEngine(seed, preferences);
+    }
+
+    protected void initCells() {
+        int width = preferences.getWorldWidth();
+        int height = preferences.getWorldHeight();
+
+        this.cells = new Cell[width][height];
+        this.cellsHandled = new boolean[width][height];
+
+        for (int x = 0; x < width; x++){
+            for (int y = 0; y < height; y++){
+                cells[x][y] = new Cell();
+                cellsHandled[x][y] = false;
+            }
+        }
+    }
+
+    protected void resetHandledCells() {
+        int width = preferences.getWorldWidth();
+        int height = preferences.getWorldHeight();
+
+        for (int x = 0; x < width; x++){
+            for (int y = 0; y < height; y++){
+                cellsHandled[x][y] = false;
+            }
+        }
     }
 
     public void spawnBots(int count) {
@@ -22,16 +52,17 @@ public class World {
             Point pos = randomEngine.getRandomMapCoords();
             Bot bot = randomEngine.generateRandomBot();
 
-            Bot source = bots[(int)pos.x][(int)pos.y];
+            Bot source = cells[(int)pos.x][(int)pos.y].getBot();
 
-            if (source == null)
-                bots[(int)pos.x][(int)pos.y] = bot;
+            if (source == null || !source.isAlive())
+                cells[(int)pos.x][(int)pos.y].setBot(bot);
         }
     }
 
     public void restart() {
-        this.bots = new Bot[preferences.getWorldWidth()][preferences.getWorldHeight()];
-        spawnBots(500);
+        initCells();
+        this.interpreter.reset();
+        this.randomEngine.reset();
     }
 
     protected int convertX(int x) {
@@ -46,8 +77,17 @@ public class World {
         return preferences;
     }
 
-    public Interpreter getInterpreter() {
-        return interpreter;
+    public void step() {
+        resetHandledCells();
+        interpreter.step();
+    }
+
+    public long getBotsCount() {
+        return interpreter.getBotsCount();
+    }
+
+    public long getSteps() {
+        return interpreter.getSteps();
     }
 
     public RandomEngine getRandomEngine() {
@@ -58,7 +98,7 @@ public class World {
         x = convertX(x);
         y = convertY(y);
 
-        return bots[x][y] != null;
+        return cells[x][y].getBot() != null;
     }
 
     public boolean eatBot(int x, int y, int deltaX, int deltaY) {
@@ -68,21 +108,19 @@ public class World {
         int toX = convertX(x + deltaX);
         int toY = convertY(y + deltaY);
 
-        Bot source = bots[x][y];
-        Bot to = bots[toX][toY];
+        Bot source = cells[x][y].getBot();
+        Bot to = cells[toX][toY].getBot();
 
-        if (to == null)
+        source.hit();
+
+        if (to == null || source.getEnergy() == 0)
             return false;
 
-        if (to.isAlive()) {
-            source.hit();
+        source.eatAnother(to.getEnergy());
 
-            if (source.getEnergy() == 0)
-                return false;
-        }
-
-        source.eatAnother(Math.max(preferences.botAnotherEatAmountMin, to.getEnergy()));
-        bots[toX][toY] = null;
+        cells[toX][toY].setBot(null);
+        cellsHandled[toX][toY] = true;
+        cellsHandled[x][x] = true;
 
         return true;
     }
@@ -94,24 +132,30 @@ public class World {
         int toX = convertX(x + deltaX);
         int toY = convertY(y + deltaY);
 
-        Bot source = bots[x][y];
-        Bot to = bots[toX][toY];
+        Bot source = cells[x][y].getBot();
+        Bot to = cells[toX][toY].getBot();
 
-        if (to != null && to.isAlive())
+        if (to != null)
             return false;
 
-        bots[toX][toY] = randomEngine.duplicateBot(source);
+        cells[toX][toY].setBot(randomEngine.duplicateBot(source));
 
         source.doubled();
+        cellsHandled[toX][toY] = true;
+        cellsHandled[x][x] = true;
 
         return true;
     }
 
     public Bot getBot(int x, int y) {
+        return getCell(x, y).getBot();
+    }
+
+    public Cell getCell(int x, int y) {
         x = convertX(x);
         y = convertY(y);
 
-        return bots[x][y];
+        return cells[x][y];
     }
 
     public boolean moveBot(int x, int y, int deltaX, int deltaY) {
@@ -121,21 +165,50 @@ public class World {
         int toX = convertX(x + deltaX);
         int toY = convertY(y + deltaY);
 
-        Bot source = bots[x][y];
-        Bot to = bots[toX][toY];
+        Bot source = cells[x][y].getBot();
+        Bot to = cells[toX][toY].getBot();
 
         source.moved();
 
         if (to != null)
             return false;
 
-        bots[toX][toY] = source;
-        bots[x][y] = null;
+        cells[toX][toY].setBot(source);
+        cells[x][y].setBot(null);
+
+        cellsHandled[toX][toY] = true;
+        cellsHandled[x][x] = true;
 
         return true;
     }
 
-    public Bot[][] getBots() {
-        return bots;
+    public boolean moveEnergy(int x, int y, int deltaX, int deltaY, int amount) {
+        x = convertX(x);
+        y = convertY(y);
+
+        int toX = convertX(x + deltaX);
+        int toY = convertY(y + deltaY);
+
+        Bot source = cells[x][y].getBot();
+        Bot to = cells[toX][toY].getBot();
+
+        if (to == null || !to.isAlive())
+            return false;
+
+        if (source.getEnergy() < amount)
+            return false;
+
+        source.changeEnergy(-amount);
+        to.changeEnergy(amount);
+
+        return true;
+    }
+
+    public Cell[][] getCells() {
+        return cells;
+    }
+
+    public boolean[][] getCellsHandled() {
+        return cellsHandled;
     }
 }

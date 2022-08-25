@@ -6,10 +6,10 @@ uniform mat4 view_matrix;
 
 in vec2 vertex;
 in vec2 pos;
-in vec3 in_color;
+in vec4 in_color;
 in float size;
 
-out vec3 out_color;
+out vec4 out_color;
 
 void main() {
     gl_Position = projection_matrix * view_matrix * vec4(vertex * size + pos, 0, 1);

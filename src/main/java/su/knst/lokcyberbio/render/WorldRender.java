@@ -2,7 +2,10 @@ package su.knst.lokcyberbio.render;
 
 import org.lwjgl.opengl.*;
 import su.knst.lokcyberbio.bot.Bot;
+import su.knst.lokcyberbio.interpreter.DNACommand;
+import su.knst.lokcyberbio.world.Cell;
 import su.knst.lokcyberbio.world.World;
+import su.knst.lokutils.objects.Color;
 import su.knst.lokutils.objects.Point;
 import su.knst.lokutils.objects.Rect;
 import su.knst.lokutils.objects.Size;
@@ -10,6 +13,7 @@ import su.knst.lokutils.render.VAO;
 import su.knst.lokutils.render.VBO;
 import su.knst.lokutils.render.context.RenderingContext;
 
+import java.awt.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,15 +40,22 @@ public class WorldRender {
     protected Size windowsResolution;
     protected Point offset;
 
-    public WorldRender(World world) throws IOException {
+    protected boolean enabled = true;
+
+    public WorldRender(World world) {
         this.world = world;
         this.worldSize = world.getPreferences().getWorldWidth() * world.getPreferences().getWorldHeight();
+    }
 
-        shader = new WorldShader();
+    public void init() throws IOException {
+        this.shader = new WorldShader();
         setOffset(Point.ZERO);
     }
 
     public void render(RenderingContext context) {
+        if (!enabled)
+            return;
+
         vao.bind();
         shader.bind();
 
@@ -55,17 +66,34 @@ public class WorldRender {
     }
 
     public void update(Size windowsResolution) {
+        if (!enabled)
+            return;
+
         this.windowsResolution = windowsResolution;
         shader.update(windowsResolution);
 
         refresh();
     }
 
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
     public void setOffset(Point offset) {
+        if (!enabled)
+            return;
+
         this.offset = offset;
     }
 
     public void deltaOffset(Point delta) {
+        if (!enabled)
+            return;
+
         this.offset = this.offset.offset(delta);
     }
 
@@ -78,6 +106,9 @@ public class WorldRender {
     }
 
     public void zoom(float delta) {
+        if (!enabled)
+            return;
+
         float oldBotsSize = botsSize;
 
         botsSize = (float) Math.max(0.1, botsSize + delta * botsSize / 5f);
@@ -87,13 +118,20 @@ public class WorldRender {
                 .setY(offset.y * (botsSize / oldBotsSize));
     }
 
-    protected List<PreparedBot> prepareBots() {
-        ArrayList<PreparedBot> preparedBots = new ArrayList<>();
-        Bot[][] bots = world.getBots();
+    protected List<PreparedCell> prepareBots() {
+        ArrayList<PreparedCell> preparedCells = new ArrayList<>();
+        Cell[][] cells = world.getCells();
 
         for (int y = 0; y < world.getPreferences().getWorldHeight(); y++) {
             for (int x = 0; x < world.getPreferences().getWorldWidth(); x++) {
-                Bot bot = bots[x][y];
+                Cell cell = cells[x][y];
+
+                if (renderMode == RenderMode.MINERALS){
+                    preparedCells.add(new PreparedCell(x, y, 1f, new Color(0.1f, 0.1f, Math.max(0.1f, cell.getMinerals() / 1000f), 1)));
+                    continue;
+                }
+
+                Bot bot = cell.getBot();
 
                 if (bot == null)
                     continue;
@@ -102,19 +140,49 @@ public class WorldRender {
 
                 switch (renderMode){
                     case REAL:
-                        preparedBots.add(new PreparedBot(x, y, isAlive ? 1f : 0.7f, bot.getColor().red / (isAlive ? 1f : 1.5f), bot.getColor().green / (isAlive ? 1f : 1.5f), bot.getColor().blue / (isAlive ? 1f : 1.5f)));
+                        preparedCells.add(new PreparedCell(x, y, isAlive ? 1f : 0.7f, new Color(bot.getColor().red / (isAlive ? 1f : 1.5f), bot.getColor().green / (isAlive ? 1f : 1.5f), bot.getColor().blue / (isAlive ? 1f : 1.5f), 1)));
                         break;
-                    case HEALTH:
-                        preparedBots.add(new PreparedBot(x, y, isAlive ? 1f : 0.7f, bot.getHealth() / (float)world.getPreferences().getBotMaxHealth(), 0, 0));
+                    case TYPE:
+                        int eat = 0;
+                        int photo = 0;
+                        int minerals = 0;
+
+                        for (Integer c : bot.getDNA()) {
+                            if (c == DNACommand.EAT_BOT.ordinal())
+                                eat++;
+                            else if (c == DNACommand.PHOTOSYNTHESIS.ordinal()) {
+                                photo++;
+                            }else if (c == DNACommand.EAT_MINERALS.ordinal()) {
+                                minerals++;
+                            }
+                        }
+                        int sum = eat + photo + minerals;
+
+                        if (sum != 0)
+                            preparedCells.add(new PreparedCell(x, y, isAlive ? 1f : 0.7f, new Color(eat / (float)sum, photo / (float)sum, minerals / (float)sum, 1)));
+                        else {
+                            preparedCells.add(new PreparedCell(x, y, isAlive ? 1f : 0.7f, new Color(0, 0, 0, 1)));
+                        }
+
+//                        for (Integer c : bot.getDNA()) {
+//                            if (c == 0) {
+//                                preparedCells.add(new PreparedCell(x, y, isAlive ? 1f : 0.7f, new Color(1,0, 0, 1)));
+//                                break;
+//                            } else if (c == 1) {
+//                                preparedCells.add(new PreparedCell(x, y, isAlive ? 1f : 0.7f, new Color(0,1, 0, 1)));
+//                                break;
+//                            }
+//                        }
+
                         break;
                     case ENERGY:
-                        preparedBots.add(new PreparedBot(x, y, isAlive ? 1f : 0.7f, 0, bot.getEnergy() / (float)world.getPreferences().getBotMaxEnergy(), 0));
+                        preparedCells.add(new PreparedCell(x, y, isAlive ? 1f : 0.7f,  new Color(0, bot.getEnergy() / (float)world.getPreferences().getBotMaxEnergy(), 0, 1)));
                         break;
                 }
             }
         }
 
-        return preparedBots;
+        return preparedCells;
     }
 
     protected void refresh() {
@@ -126,8 +194,8 @@ public class WorldRender {
         drawMode = rect.glDrawMode();
         rectVBO.putData(rect.toVertexes());
 
-        List<PreparedBot> preparedBots = prepareBots();
-        botsCount = preparedBots.size();
+        List<PreparedCell> preparedCells = prepareBots();
+        botsCount = preparedCells.size();
 
         if (botsPos != null)
             botsPos.delete();
@@ -144,18 +212,20 @@ public class WorldRender {
 
         botsSizes = new VBO();
 
-        float[] pos = new float[preparedBots.size() * 2];
-        float[] colors = new float[preparedBots.size() * 3];
-        float[] sizes = new float[preparedBots.size()];
+        float[] pos = new float[preparedCells.size() * 2];
+        float[] colors = new float[preparedCells.size() * 4];
+        float[] sizes = new float[preparedCells.size()];
 
-        for (int b = 0; b < preparedBots.size(); b++) {
-            PreparedBot bot = preparedBots.get(b);
+        for (int b = 0; b < preparedCells.size(); b++) {
+            PreparedCell bot = preparedCells.get(b);
+
             pos[b * 2] = bot.x * botsSize + offset.x + (1 - bot.size) * (botsSize / 2);
             pos[b * 2 + 1] = -bot.y * botsSize + offset.y + (1 - bot.size) * (botsSize / 2);
 
-            colors[b * 3] = bot.r;
-            colors[b * 3 + 1] = bot.g;
-            colors[b * 3 + 2] = bot.b;
+            colors[b * 4] = bot.color.red;
+            colors[b * 4 + 1] = bot.color.green;
+            colors[b * 4 + 2] = bot.color.blue;
+            colors[b * 4 + 3] = bot.color.alpha;
 
             sizes[b] = bot.size;
         }
@@ -189,7 +259,7 @@ public class WorldRender {
         botsColors.bind();
 
         GL31.glEnableVertexAttribArray(2);
-        GL31.glVertexAttribPointer(2, 3, GL_FLOAT, false, Float.BYTES * 3, 0);
+        GL31.glVertexAttribPointer(2, 4, GL_FLOAT, false, Float.BYTES * 4, 0);
         glVertexAttribDivisor(2, 1);
 
         botsColors.unbind();
